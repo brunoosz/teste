@@ -1,18 +1,33 @@
 import os
+import sys
 import uuid
+import threading
+import webbrowser
+import tempfile
 from pathlib import Path
 
 from flask import Flask, render_template, request, send_file, jsonify
 from PIL import Image
 from werkzeug.utils import secure_filename
 
-app = Flask(__name__)
+
+def resource_path(relative_path):
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / relative_path
+    return Path(__file__).parent / relative_path
+
+
+app = Flask(
+    __name__,
+    template_folder=str(resource_path("templates")),
+)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 
-UPLOAD_DIR = Path("uploads")
-OUTPUT_DIR = Path("outputs")
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
+DATA_DIR = Path(tempfile.gettempdir()) / "fileflow_data"
+UPLOAD_DIR = DATA_DIR / "uploads"
+OUTPUT_DIR = DATA_DIR / "outputs"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "bmp", "webp", "gif", "tiff", "tif", "ico"}
 
@@ -183,5 +198,13 @@ def api_remove_bg():
         src.unlink(missing_ok=True)
 
 
+def open_browser():
+    webbrowser.open("http://localhost:5000")
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    if getattr(sys, "frozen", False):
+        threading.Timer(1.5, open_browser).start()
+        app.run(host="127.0.0.1", port=5000, debug=False)
+    else:
+        app.run(debug=True, port=5000)

@@ -1,0 +1,9 @@
+flask
+rembg
+pillow
+pdf2docx
+python-docx
+python-pptx
+openpyxl
+werkzeug
+fpdf2

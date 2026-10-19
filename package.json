@@ -1,0 +1,100 @@
+{
+  "name": "fileflow",
+  "productName": "FileFlow",
+  "version": "1.0.0",
+  "description": "FileFlow — Converta arquivos e remova fundos.",
+  "main": "dist-electron/main.js",
+  "author": "Bruno Camperlingo",
+  "license": "MIT",
+  "repository": "github:brunoosz/teste",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:renderer": "vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "npm run build:renderer && npm run build:electron",
+    "electron:dev": "node scripts/build-electron.mjs && concurrently -k -n vite,app \"vite\" \"wait-on tcp:5173 && electron . --dev\"",
+    "electron:start": "npm run build && electron .",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.fileflow.app",
+    "productName": "FileFlow",
+    "copyright": "Copyright © 2026 Bruno Camperlingo",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/main.js",
+      "dist-electron/preload.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/sharp",
+        "to": "node_modules/sharp"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FileFlow",
+      "artifactName": "FileFlow-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "FileFlow-Portatil-${version}.${ext}"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png",
+      "category": "Utility"
+    }
+  },
+  "dependencies": {
+    "sharp": "^0.33.5",
+    "@imgly/background-removal-node": "^1.4.5",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "clsx": "^2.1.1",
+    "concurrently": "^8.2.2",
+    "electron": "^33.4.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.12",
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^1.53.0",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.4",
+    "typescript": "^5.4.5",
+    "vite": "^5.4.21",
+    "wait-on": "^7.2.0"
+  }
+}

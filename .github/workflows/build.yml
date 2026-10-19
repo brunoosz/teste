@@ -1,0 +1,105 @@
+name: FileFlow - build e release
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fileflow-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  VERSION: "1.0.0"
+
+jobs:
+  windows:
+    name: Executável Windows (.exe)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Gerar executável
+        run: pyinstaller fileflow.spec --noconfirm
+
+      - name: Renomear para versionado
+        shell: bash
+        run: |
+          mkdir -p release
+          cp dist/FileFlow.exe "release/FileFlow-Portatil-${VERSION}.exe"
+
+      - name: Guardar .exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: release/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Publicar release
+    runs-on: ubuntu-latest
+    needs: [windows]
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - run: ls -la release
+
+      - name: Remover releases anteriores
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 500 --json tagName --jq '.[].tagName' |
+            while read -r tag; do
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            done
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/v$VERSION" 2>/dev/null || true
+
+      - name: Publicar na página de Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: FileFlow ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          make_latest: "true"
+          files: |
+            release/*.exe
+          body: |
+            ## Como instalar
+
+            **Windows**
+            - **FileFlow-Portatil-${{ env.VERSION }}.exe**: versão portátil, roda sem instalar. Basta dar dois cliques.
+
+            Na primeira vez, o Windows pode mostrar "O Windows protegeu o computador", porque o app não tem certificado de assinatura. Clique em **Mais informações → Executar assim mesmo**.
+
+            ---
+
+            Converta arquivos (imagens, PDF, DOCX, XLSX, CSV) e remova fundos de imagens.

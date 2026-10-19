@@ -1,0 +1,264 @@
+import { useCallback, useState } from "react";
+import { motion } from "framer-motion";
+import { Upload, FileIcon, X, Check, Download, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+
+type Status = "idle" | "loading" | "success" | "error";
+
+const IMAGE_EXTS = new Set([
+  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif", "svg",
+]);
+
+const ALL_TARGETS = [
+  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico",
+];
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1048576).toFixed(1) + " MB";
+}
+
+function getExtension(name: string): string {
+  return name.split(".").pop()?.toLowerCase() ?? "";
+}
+
+export function Converter() {
+  const [file, setFile] = useState<File | null>(null);
+  const [filePath, setFilePath] = useState<string | null>(null);
+  const [targets, setTargets] = useState<string[]>([]);
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
+  const [status, setStatus] = useState<Status>("idle");
+  const [statusMsg, setStatusMsg] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+
+  const isElectron = !!window.fileflow;
+
+  const handleFile = useCallback(async (f: File, path?: string) => {
+    setFile(f);
+    setFilePath(path ?? null);
+    setSelectedTarget(null);
+    setStatus("idle");
+
+    const ext = getExtension(f.name);
+
+    if (isElectron) {
+      const result = await window.fileflow!.invoke("get-targets", ext) as string[];
+      setTargets(result);
+    } else {
+      if (IMAGE_EXTS.has(ext)) {
+        setTargets(ALL_TARGETS.filter((t) => t !== ext));
+      } else {
+        setTargets([]);
+      }
+    }
+  }, [isElectron]);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
+      const f = e.dataTransfer.files[0];
+      if (f) {
+        const path = (f as unknown as { path?: string }).path;
+        void handleFile(f, path);
+      }
+    },
+    [handleFile]
+  );
+
+  const handlePick = useCallback(async () => {
+    if (isElectron) {
+      const path = await window.fileflow!.invoke("pick-file") as string | null;
+      if (!path) return;
+      const name = path.split(/[\\/]/).pop() ?? "file";
+      const fakeFile = new File([], name);
+      void handleFile(fakeFile, path);
+    } else {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.onchange = () => {
+        const f = input.files?.[0];
+        if (f) void handleFile(f);
+      };
+      input.click();
+    }
+  }, [handleFile, isElectron]);
+
+  const handleConvert = useCallback(async () => {
+    if (!selectedTarget || (!filePath && !file)) return;
+    setStatus("loading");
+    setStatusMsg("Convertendo...");
+
+    try {
+      if (isElectron && filePath) {
+        const result = (await window.fileflow!.invoke("convert-file", {
+          inputPath: filePath,
+          outputFormat: selectedTarget,
+        })) as { outputPath: string };
+
+        const name = (file?.name ?? "arquivo").replace(/\.[^.]+$/, "") + "." + selectedTarget;
+        await window.fileflow!.invoke("save-file", {
+          defaultName: name,
+          sourcePath: result.outputPath,
+        });
+
+        setStatus("success");
+        setStatusMsg("Convertido com sucesso!");
+      } else {
+        setStatus("error");
+        setStatusMsg("Conversão disponível apenas no app desktop");
+      }
+    } catch (err) {
+      setStatus("error");
+      setStatusMsg(err instanceof Error ? err.message : "Erro na conversão");
+    }
+  }, [selectedTarget, filePath, file, isElectron]);
+
+  const clear = () => {
+    setFile(null);
+    setFilePath(null);
+    setTargets([]);
+    setSelectedTarget(null);
+    setStatus("idle");
+  };
+
+  return (
+    <div data-enter="">
+      {/* Drop zone */}
+      {!file && (
+        <div
+          className={`surface p-10 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 ${
+            dragOver ? "border-primary/60 bg-primary/[0.04]" : ""
+          }`}
+          onClick={handlePick}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+        >
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Upload size={22} className="text-primary" />
+          </div>
+          <p className="text-body text-fg font-medium mb-1">
+            Arraste um arquivo aqui
+          </p>
+          <p className="text-footnote text-muted">
+            ou <span className="text-primary font-semibold">clique para selecionar</span>
+          </p>
+        </div>
+      )}
+
+      {/* File info */}
+      {file && (
+        <div className="surface p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-card bg-primary/10 flex items-center justify-center shrink-0">
+            <FileIcon size={20} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-body font-semibold truncate">{file.name}</p>
+            {file.size > 0 && (
+              <p className="text-footnote text-muted">{formatSize(file.size)}</p>
+            )}
+          </div>
+          <button
+            onClick={clear}
+            className="h-8 w-8 rounded-full flex items-center justify-center text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Target formats */}
+      {file && targets.length > 0 && (
+        <div className="mt-4">
+          <p className="text-caption text-muted mb-3 px-1">CONVERTER PARA</p>
+          <div className="flex flex-wrap gap-2">
+            {targets.map((t) => (
+              <motion.button
+                key={t}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setSelectedTarget(t)}
+                className={`no-drag h-9 px-4 rounded-full text-footnote font-bold uppercase tracking-wide transition-all duration-150 ${
+                  selectedTarget === t
+                    ? "bg-primary text-white shadow-md"
+                    : "surface text-fg hover:bg-line/[0.06]"
+                }`}
+              >
+                {t}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {file && targets.length === 0 && (
+        <div className="mt-4 surface p-4 flex items-center gap-3">
+          <AlertCircle size={18} className="text-warning shrink-0" />
+          <p className="text-footnote text-muted">
+            Formato não suportado para conversão
+          </p>
+        </div>
+      )}
+
+      {/* Convert button */}
+      {selectedTarget && (
+        <div className="mt-5">
+          <Button
+            block
+            size="lg"
+            icon={Download}
+            loading={status === "loading"}
+            onClick={handleConvert}
+          >
+            Converter para {selectedTarget.toUpperCase()}
+          </Button>
+        </div>
+      )}
+
+      {/* Status */}
+      {status === "success" && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 surface p-4 flex items-center gap-3 border-success/20"
+        >
+          <div className="h-7 w-7 rounded-full bg-success/15 flex items-center justify-center">
+            <Check size={15} className="text-success" />
+          </div>
+          <p className="text-footnote text-success font-medium">{statusMsg}</p>
+        </motion.div>
+      )}
+
+      {status === "error" && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 surface p-4 flex items-center gap-3 border-danger/20"
+        >
+          <div className="h-7 w-7 rounded-full bg-danger/15 flex items-center justify-center">
+            <AlertCircle size={15} className="text-danger" />
+          </div>
+          <p className="text-footnote text-danger font-medium">{statusMsg}</p>
+        </motion.div>
+      )}
+
+      {/* Supported formats */}
+      <div className="mt-8 px-1">
+        <p className="text-caption text-muted mb-3">FORMATOS SUPORTADOS</p>
+        <div className="flex flex-wrap gap-1.5">
+          {["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG", "PDF"].map(
+            (f) => (
+              <span
+                key={f}
+                className="h-6 px-2.5 bg-elevated/60 rounded-chip text-caption text-muted flex items-center"
+              >
+                {f}
+              </span>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

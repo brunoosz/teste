@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="dark"] {
+  --bg: 17 17 19;
+  --surface: 26 26 29;
+  --elevated: 38 38 42;
+  --line: 236 232 222;
+  --fg: 244 241 234;
+  --muted: 163 159 151;
+  --primary: 92 150 255;
+  --secondary: 196 170 255;
+  --success: 61 220 132;
+  --danger: 255 107 107;
+  --warning: 255 206 77;
+  --ink: 244 241 234;
+  --ink-contrast: 17 17 19;
+  --separator: 236 232 222;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: 243 239 230;
+  --surface: 255 255 255;
+  --elevated: 236 231 220;
+  --line: 17 17 19;
+  --fg: 17 17 19;
+  --muted: 96 93 88;
+  --primary: 37 99 235;
+  --secondary: 124 77 255;
+  --success: 10 132 64;
+  --danger: 210 43 43;
+  --warning: 176 112 0;
+  --ink: 17 17 19;
+  --ink-contrast: 255 255 255;
+  --separator: 17 17 19;
+  color-scheme: light;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-bg text-fg font-sans antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03", "tnum";
+    font-weight: 450;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--primary) / 0.3);
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  button,
+  [role="button"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line) / 0.18);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--line) / 0.32);
+    background-clip: content-box;
+    border: 3px solid transparent;
+  }
+}
+
+@layer components {
+  .drag {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+
+  .surface {
+    @apply bg-surface;
+    border-radius: var(--radius-lg);
+    border: 1px solid rgb(var(--line) / 0.12);
+  }
+
+  .glass {
+    background: rgb(var(--surface));
+  }
+
+  .field {
+    @apply w-full h-11 bg-elevated/60 px-3.5 text-body text-fg placeholder:text-muted/70 outline-none;
+    border-radius: var(--radius-md);
+    border: 1px solid rgb(var(--separator) / 0.12);
+    transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+  }
+  .field:focus {
+    @apply border-primary/60 bg-elevated/80;
+    box-shadow: 0 0 0 4px rgb(var(--primary) / 0.15);
+  }
+
+  .pressable {
+    transition: transform 120ms var(--ease-out), background-color 150ms ease;
+  }
+  .pressable:active {
+    transform: scale(0.97);
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(var(--line) / 0.08);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(var(--line) / 0.08), transparent);
+  animation: shimmer 1.6s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+[data-enter] .surface {
+  animation: enter-rise 320ms var(--ease-out) both;
+}
+[data-enter] .surface:nth-child(2) { animation-delay: 40ms; }
+[data-enter] .surface:nth-child(3) { animation-delay: 80ms; }
+[data-enter] .surface:nth-child(4) { animation-delay: 120ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-enter] .surface { animation: none; }
+  .pressable,
+  .pressable:active {
+    transition: none;
+    transform: none;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

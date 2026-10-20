@@ -71,6 +71,8 @@ jobs:
       - run: npm ci
       - name: Build web
         run: npm run build:renderer
+      - name: Inicializar projeto Android
+        run: npx cap add android
       - name: Sincronizar Capacitor
         run: npx cap sync android
       - name: Build APK

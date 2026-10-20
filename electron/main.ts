@@ -134,8 +134,26 @@ async function removeBackground(inputPath: string): Promise<string> {
 
   const resultBlob = await removeBg(blob, publicPath ? { publicPath } : undefined);
   const arrayBuf = await resultBlob.arrayBuffer();
+  const rawOut = Buffer.from(arrayBuf);
+
+  const sharp = (await import("sharp")).default;
+  const { data, info } = await sharp(rawOut).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (a < 25) {
+      data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 0;
+    } else if (a < 240) {
+      const f = a / 255;
+      data[i] = Math.round(data[i] * f);
+      data[i + 1] = Math.round(data[i + 1] * f);
+      data[i + 2] = Math.round(data[i + 2] * f);
+    }
+  }
+
   const outPath = tmpPath("png");
-  fs.writeFileSync(outPath, Buffer.from(arrayBuf));
+  await sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } })
+    .png()
+    .toFile(outPath);
   return outPath;
 }
 

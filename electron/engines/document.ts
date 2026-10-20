@@ -4,7 +4,7 @@ import type { ConversionEngine, EngineHelpers } from "./types";
 const EXTENSIONS = ["pdf", "docx", "doc", "pptx", "txt", "html", "htm", "md", "rtf"];
 
 const TARGETS: Record<string, string[]> = {
-  pdf: ["txt", "png", "jpg", "html", "md"],
+  pdf: ["docx", "pptx", "rtf", "txt", "html", "md", "png", "jpg"],
   docx: ["html", "txt", "md", "pdf"],
   doc: ["txt", "pdf"],
   pptx: ["txt", "html", "pdf"],
@@ -106,6 +106,55 @@ async function convert(inputPath: string, outputFormat: string, helpers: EngineH
       const buf = fs.readFileSync(inputPath);
       const data = await pdfParse(buf);
       fs.writeFileSync(outPath, data.text, "utf-8");
+      return outPath;
+    }
+    if (out === "docx") {
+      const pdfParse = (await import("pdf-parse")).default;
+      const { Document, Packer, Paragraph, TextRun } = await import("docx");
+      const buf = fs.readFileSync(inputPath);
+      const data = await pdfParse(buf);
+      const paragraphs = data.text.split(/\n{2,}/).filter((p: string) => p.trim());
+      const doc = new Document({
+        sections: [{
+          children: paragraphs.map((p: string) => new Paragraph({
+            children: [new TextRun({ text: p.trim(), size: 24 })],
+            spacing: { after: 200 },
+          })),
+        }],
+      });
+      const docxBuf = await Packer.toBuffer(doc);
+      fs.writeFileSync(outPath, docxBuf);
+      return outPath;
+    }
+    if (out === "pptx") {
+      const pdfParse = (await import("pdf-parse")).default;
+      const PptxGenJS = (await import("pptxgenjs")).default;
+      const buf = fs.readFileSync(inputPath);
+      const data = await pdfParse(buf);
+      const pptx = new PptxGenJS();
+      const pages = data.text.split(/\f|\n{3,}/).filter((p: string) => p.trim());
+      if (pages.length === 0) pages.push(data.text || "Documento vazio");
+      for (const pageText of pages) {
+        const slide = pptx.addSlide();
+        slide.addText(pageText.trim(), {
+          x: 0.5, y: 0.5, w: "90%", h: "85%",
+          fontSize: 14, valign: "top", wrap: true,
+        });
+      }
+      await pptx.writeFile({ fileName: outPath });
+      return outPath;
+    }
+    if (out === "rtf") {
+      const pdfParse = (await import("pdf-parse")).default;
+      const buf = fs.readFileSync(inputPath);
+      const data = await pdfParse(buf);
+      const escaped = data.text
+        .replace(/\\/g, "\\\\")
+        .replace(/\{/g, "\\{")
+        .replace(/\}/g, "\\}")
+        .replace(/\n/g, "\\par\n");
+      const rtf = `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\n\\f0\\fs24\n${escaped}\n}`;
+      fs.writeFileSync(outPath, rtf, "utf-8");
       return outPath;
     }
   }

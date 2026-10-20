@@ -9,6 +9,8 @@ import {
   AlertCircle,
   Image,
   FileText,
+  Music,
+  Film,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -34,6 +36,20 @@ const CATEGORIES: { category: string; label: string; icon: typeof Image; extensi
     extensions: ["PDF", "DOCX", "TXT", "HTML", "MD"],
     color: "secondary",
   },
+  {
+    category: "audio",
+    label: "Áudio",
+    icon: Music,
+    extensions: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "OPUS"],
+    color: "success",
+  },
+  {
+    category: "video",
+    label: "Vídeo",
+    icon: Film,
+    extensions: ["MP4", "MKV", "WEBM", "AVI", "MOV", "GIF"],
+    color: "warning",
+  },
 ];
 
 const EXT_TO_CATEGORY: Record<string, CategoryInfo> = {};
@@ -43,15 +59,17 @@ for (const cat of CATEGORIES) {
   }
 }
 
-const IMAGE_TARGETS = ["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico"];
-const DOC_TARGETS = ["pdf", "docx", "txt", "html", "md"];
+const FALLBACK_TARGETS: Record<string, string[]> = {
+  image: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico"],
+  document: ["pdf", "docx", "txt", "html", "md"],
+  audio: ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus"],
+  video: ["mp4", "mkv", "webm", "avi", "mov", "gif"],
+};
 
 function fallbackTargets(ext: string): string[] {
   const cat = EXT_TO_CATEGORY[ext];
   if (!cat) return [];
-  if (cat.category === "image") return IMAGE_TARGETS.filter((t) => t !== ext);
-  if (cat.category === "document") return DOC_TARGETS.filter((t) => t !== ext);
-  return [];
+  return (FALLBACK_TARGETS[cat.category] ?? []).filter((t) => t !== ext);
 }
 
 function formatSize(bytes: number): string {
@@ -67,6 +85,8 @@ function getExtension(name: string): string {
 const BADGE_STYLES: Record<string, string> = {
   image: "bg-primary/10 text-primary",
   document: "bg-secondary/10 text-secondary",
+  audio: "bg-success/10 text-success",
+  video: "bg-warning/10 text-warning",
 };
 
 export function Converter() {
@@ -319,9 +339,9 @@ export function Converter() {
               <div key={cat.category} className="surface p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div
-                    className={`h-7 w-7 rounded-full flex items-center justify-center bg-${cat.color}/10`}
+                    className={`h-7 w-7 rounded-full flex items-center justify-center ${BADGE_STYLES[cat.category]?.split(" ")[0] ?? "bg-elevated"}`}
                   >
-                    <Icon size={14} className={`text-${cat.color}`} />
+                    <Icon size={14} className={BADGE_STYLES[cat.category]?.split(" ")[1] ?? "text-muted"} />
                   </div>
                   <p className="text-callout font-semibold text-fg">{cat.label}</p>
                 </div>

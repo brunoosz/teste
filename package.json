@@ -37,7 +37,14 @@
       {
         "from": "node_modules/sharp",
         "to": "node_modules/sharp"
+      },
+      {
+        "from": "node_modules/ffmpeg-static",
+        "to": "node_modules/ffmpeg-static"
       }
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
     ],
     "win": {
       "target": [
@@ -71,6 +78,7 @@
   },
   "dependencies": {
     "@imgly/background-removal-node": "^1.4.5",
+    "ffmpeg-static": "^5.2.0",
     "mammoth": "^1.13.0",
     "marked": "^18.1.1",
     "pdf-lib": "^1.17.1",

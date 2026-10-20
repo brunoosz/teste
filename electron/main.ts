@@ -124,7 +124,13 @@ async function removeBackground(inputPath: string): Promise<string> {
   const { removeBackground: removeBg } = await import("@imgly/background-removal-node");
   const inputBuf = fs.readFileSync(inputPath);
   const blob = new Blob([inputBuf]);
-  const resultBlob = await removeBg(blob);
+
+  let publicPath: string | undefined;
+  if (app.isPackaged) {
+    publicPath = `file://${path.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "@imgly", "background-removal-node", "dist")}/`;
+  }
+
+  const resultBlob = await removeBg(blob, publicPath ? { publicPath } : undefined);
   const arrayBuf = await resultBlob.arrayBuffer();
   const outPath = tmpPath("png");
   fs.writeFileSync(outPath, Buffer.from(arrayBuf));

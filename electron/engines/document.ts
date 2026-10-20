@@ -4,7 +4,7 @@ import type { ConversionEngine, EngineHelpers } from "./types";
 const EXTENSIONS = ["pdf", "docx", "doc", "pptx", "txt", "html", "htm", "md", "rtf"];
 
 const TARGETS: Record<string, string[]> = {
-  pdf: ["txt", "png", "jpg"],
+  pdf: ["txt", "png", "jpg", "html", "md"],
   docx: ["html", "txt", "md", "pdf"],
   doc: ["txt", "pdf"],
   pptx: ["txt", "html", "pdf"],
@@ -92,6 +92,21 @@ async function convert(inputPath: string, outputFormat: string, helpers: EngineH
       else pipeline = pipeline.png();
       await pipeline.toFile(imgPath);
       return imgPath;
+    }
+    if (out === "html") {
+      const pdfParse = (await import("pdf-parse")).default;
+      const buf = fs.readFileSync(inputPath);
+      const data = await pdfParse(buf);
+      const escaped = data.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+      fs.writeFileSync(outPath, wrapHtmlDoc(`<p>${escaped}</p>`, "PDF"), "utf-8");
+      return outPath;
+    }
+    if (out === "md") {
+      const pdfParse = (await import("pdf-parse")).default;
+      const buf = fs.readFileSync(inputPath);
+      const data = await pdfParse(buf);
+      fs.writeFileSync(outPath, data.text, "utf-8");
+      return outPath;
     }
   }
 

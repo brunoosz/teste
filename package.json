@@ -17,7 +17,10 @@
     "electron:dev": "node scripts/build-electron.mjs && concurrently -k -n vite,app \"vite\" \"wait-on tcp:5173 && electron . --dev\"",
     "electron:start": "npm run build && electron .",
     "electron:build": "npm run build && electron-builder",
-    "electron:build:win": "npm run build && electron-builder --win --x64"
+    "electron:build:win": "npm run build && electron-builder --win --x64",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "build:mobile": "npm run build:renderer && npx cap sync android"
   },
   "build": {
     "appId": "com.fileflow.app",

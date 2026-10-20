@@ -1,17 +1,58 @@
 import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, FileIcon, X, Check, Download, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  FileIcon,
+  X,
+  Check,
+  Download,
+  AlertCircle,
+  Image,
+  FileText,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 type Status = "idle" | "loading" | "success" | "error";
 
-const IMAGE_EXTS = new Set([
-  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif", "svg",
-]);
+interface CategoryInfo {
+  category: string;
+  label: string;
+}
 
-const ALL_TARGETS = [
-  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico",
+const CATEGORIES: { category: string; label: string; icon: typeof Image; extensions: string[]; color: string }[] = [
+  {
+    category: "image",
+    label: "Imagens",
+    icon: Image,
+    extensions: ["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG"],
+    color: "primary",
+  },
+  {
+    category: "document",
+    label: "Documentos",
+    icon: FileText,
+    extensions: ["PDF", "DOCX", "TXT", "HTML", "MD"],
+    color: "secondary",
+  },
 ];
+
+const EXT_TO_CATEGORY: Record<string, CategoryInfo> = {};
+for (const cat of CATEGORIES) {
+  for (const ext of cat.extensions) {
+    EXT_TO_CATEGORY[ext.toLowerCase()] = { category: cat.category, label: cat.label };
+  }
+}
+
+const IMAGE_TARGETS = ["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico"];
+const DOC_TARGETS = ["pdf", "docx", "txt", "html", "md"];
+
+function fallbackTargets(ext: string): string[] {
+  const cat = EXT_TO_CATEGORY[ext];
+  if (!cat) return [];
+  if (cat.category === "image") return IMAGE_TARGETS.filter((t) => t !== ext);
+  if (cat.category === "document") return DOC_TARGETS.filter((t) => t !== ext);
+  return [];
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
@@ -23,9 +64,15 @@ function getExtension(name: string): string {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
+const BADGE_STYLES: Record<string, string> = {
+  image: "bg-primary/10 text-primary",
+  document: "bg-secondary/10 text-secondary",
+};
+
 export function Converter() {
   const [file, setFile] = useState<File | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
+  const [fileCategory, setFileCategory] = useState<CategoryInfo | null>(null);
   const [targets, setTargets] = useState<string[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -34,25 +81,29 @@ export function Converter() {
 
   const isElectron = !!window.fileflow;
 
-  const handleFile = useCallback(async (f: File, path?: string) => {
-    setFile(f);
-    setFilePath(path ?? null);
-    setSelectedTarget(null);
-    setStatus("idle");
+  const handleFile = useCallback(
+    async (f: File, path?: string) => {
+      setFile(f);
+      setFilePath(path ?? null);
+      setSelectedTarget(null);
+      setStatus("idle");
 
-    const ext = getExtension(f.name);
+      const ext = getExtension(f.name);
 
-    if (isElectron) {
-      const result = await window.fileflow!.invoke("get-targets", ext) as string[];
-      setTargets(result);
-    } else {
-      if (IMAGE_EXTS.has(ext)) {
-        setTargets(ALL_TARGETS.filter((t) => t !== ext));
+      if (isElectron) {
+        const [tgts, cat] = await Promise.all([
+          window.fileflow!.invoke("get-targets", ext) as Promise<string[]>,
+          window.fileflow!.invoke("get-category", ext) as Promise<CategoryInfo | null>,
+        ]);
+        setTargets(tgts);
+        setFileCategory(cat);
       } else {
-        setTargets([]);
+        setTargets(fallbackTargets(ext));
+        setFileCategory(EXT_TO_CATEGORY[ext] ?? null);
       }
-    }
-  }, [isElectron]);
+    },
+    [isElectron],
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -64,12 +115,12 @@ export function Converter() {
         void handleFile(f, path);
       }
     },
-    [handleFile]
+    [handleFile],
   );
 
   const handlePick = useCallback(async () => {
     if (isElectron) {
-      const path = await window.fileflow!.invoke("pick-file") as string | null;
+      const path = (await window.fileflow!.invoke("pick-file")) as string | null;
       if (!path) return;
       const name = path.split(/[\\/]/).pop() ?? "file";
       const fakeFile = new File([], name);
@@ -97,7 +148,8 @@ export function Converter() {
           outputFormat: selectedTarget,
         })) as { outputPath: string };
 
-        const name = (file?.name ?? "arquivo").replace(/\.[^.]+$/, "") + "." + selectedTarget;
+        const name =
+          (file?.name ?? "arquivo").replace(/\.[^.]+$/, "") + "." + selectedTarget;
         await window.fileflow!.invoke("save-file", {
           defaultName: name,
           sourcePath: result.outputPath,
@@ -118,6 +170,7 @@ export function Converter() {
   const clear = () => {
     setFile(null);
     setFilePath(null);
+    setFileCategory(null);
     setTargets([]);
     setSelectedTarget(null);
     setStatus("idle");
@@ -132,18 +185,20 @@ export function Converter() {
             dragOver ? "border-primary/60 bg-primary/[0.04]" : ""
           }`}
           onClick={handlePick}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Upload size={22} className="text-primary" />
           </div>
-          <p className="text-body text-fg font-medium mb-1">
-            Arraste um arquivo aqui
-          </p>
+          <p className="text-body text-fg font-medium mb-1">Arraste um arquivo aqui</p>
           <p className="text-footnote text-muted">
-            ou <span className="text-primary font-semibold">clique para selecionar</span>
+            ou{" "}
+            <span className="text-primary font-semibold">clique para selecionar</span>
           </p>
         </div>
       )}
@@ -155,7 +210,18 @@ export function Converter() {
             <FileIcon size={20} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-body font-semibold truncate">{file.name}</p>
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="text-body font-semibold truncate">{file.name}</p>
+              {fileCategory && (
+                <span
+                  className={`shrink-0 h-5 px-2 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center ${
+                    BADGE_STYLES[fileCategory.category] ?? "bg-elevated text-muted"
+                  }`}
+                >
+                  {fileCategory.label.replace(/s$/, "")}
+                </span>
+              )}
+            </div>
             {file.size > 0 && (
               <p className="text-footnote text-muted">{formatSize(file.size)}</p>
             )}
@@ -243,22 +309,37 @@ export function Converter() {
         </motion.div>
       )}
 
-      {/* Supported formats */}
-      <div className="mt-8 px-1">
-        <p className="text-caption text-muted mb-3">FORMATOS SUPORTADOS</p>
-        <div className="flex flex-wrap gap-1.5">
-          {["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG", "PDF"].map(
-            (f) => (
-              <span
-                key={f}
-                className="h-6 px-2.5 bg-elevated/60 rounded-chip text-caption text-muted flex items-center"
-              >
-                {f}
-              </span>
-            )
-          )}
+      {/* Supported formats — grouped by category */}
+      {!file && (
+        <div className="mt-6 space-y-4">
+          <p className="text-caption text-muted px-1">FORMATOS SUPORTADOS</p>
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <div key={cat.category} className="surface p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div
+                    className={`h-7 w-7 rounded-full flex items-center justify-center bg-${cat.color}/10`}
+                  >
+                    <Icon size={14} className={`text-${cat.color}`} />
+                  </div>
+                  <p className="text-callout font-semibold text-fg">{cat.label}</p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {cat.extensions.map((ext) => (
+                    <span
+                      key={ext}
+                      className="h-6 px-2.5 bg-elevated/60 rounded-chip text-caption text-muted flex items-center"
+                    >
+                      {ext}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -123,7 +123,9 @@ async function htmlToPdf(html: string): Promise<Buffer> {
 async function removeBackground(inputPath: string): Promise<string> {
   const { removeBackground: removeBg } = await import("@imgly/background-removal-node");
   const inputBuf = fs.readFileSync(inputPath);
-  const blob = new Blob([inputBuf]);
+  const ext = path.extname(inputPath).slice(1).toLowerCase();
+  const mimeMap: Record<string, string> = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+  const blob = new Blob([inputBuf], { type: mimeMap[ext] || "application/octet-stream" });
 
   let publicPath: string | undefined;
   if (app.isPackaged) {

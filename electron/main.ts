@@ -145,6 +145,32 @@ app.whenReady().then(() => {
     return result.filePath;
   });
 
+  ipcMain.handle("read-file-preview", async (_e, args: { filePath: string; maxSize?: number }) => {
+    const maxSize = args.maxSize ?? 400;
+    const sharp = (await import("sharp")).default;
+    const img = sharp(args.filePath);
+    const meta = await img.metadata();
+    const w = meta.width ?? maxSize;
+    const h = meta.height ?? maxSize;
+    const scale = Math.min(1, maxSize / Math.max(w, h));
+    const buf = await img
+      .resize(Math.round(w * scale), Math.round(h * scale), { fit: "inside" })
+      .png()
+      .toBuffer();
+    return {
+      dataUrl: `data:image/png;base64,${buf.toString("base64")}`,
+      width: Math.round(w * scale),
+      height: Math.round(h * scale),
+    };
+  });
+
+  ipcMain.handle("read-file-base64", async (_e, args: { filePath: string }) => {
+    const buf = fs.readFileSync(args.filePath);
+    const ext = path.extname(args.filePath).slice(1).toLowerCase();
+    const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    return { dataUrl: `data:${mime};base64,${buf.toString("base64")}` };
+  });
+
   ipcMain.handle("set-theme", (_e, theme: "dark" | "light") => {
     const c = themeColors(theme);
     if (win && process.platform !== "darwin") {

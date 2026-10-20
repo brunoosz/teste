@@ -9,6 +9,8 @@ const INVOKE_CHANNELS = [
   "pick-file",
   "save-file",
   "set-theme",
+  "read-file-preview",
+  "read-file-base64",
 ] as const;
 
 const allowed = new Set<string>(INVOKE_CHANNELS);

@@ -109,6 +109,8 @@ function getExtension(name: string): string {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "avif", "ico", "svg"]);
+
 const BADGE_STYLES: Record<string, string> = {
   image: "bg-primary/10 text-primary",
   document: "bg-secondary/10 text-secondary",
@@ -128,17 +130,34 @@ export function Converter() {
   const [status, setStatus] = useState<Status>("idle");
   const [statusMsg, setStatusMsg] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const isElectron = !!window.fileflow;
 
   const handleFile = useCallback(
     async (f: File, path?: string) => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setFile(f);
       setFilePath(path ?? null);
       setSelectedTarget(null);
       setStatus("idle");
+      setPreviewUrl(null);
 
       const ext = getExtension(f.name);
+      const isImage = IMAGE_EXTENSIONS.has(ext);
+
+      if (isImage) {
+        if (f.size > 0) {
+          setPreviewUrl(URL.createObjectURL(f));
+        } else if (isElectron && path) {
+          try {
+            const result = (await window.fileflow!.invoke("read-file-preview", {
+              filePath: path,
+            })) as { dataUrl: string };
+            setPreviewUrl(result.dataUrl);
+          } catch {}
+        }
+      }
 
       if (isElectron) {
         const [tgts, cat] = await Promise.all([
@@ -152,7 +171,7 @@ export function Converter() {
         setFileCategory(EXT_TO_CATEGORY[ext] ?? null);
       }
     },
-    [isElectron],
+    [isElectron, previewUrl],
   );
 
   const handleDrop = useCallback(
@@ -218,12 +237,14 @@ export function Converter() {
   }, [selectedTarget, filePath, file, isElectron]);
 
   const clear = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setFilePath(null);
     setFileCategory(null);
     setTargets([]);
     setSelectedTarget(null);
     setStatus("idle");
+    setPreviewUrl(null);
   };
 
   return (
@@ -253,35 +274,65 @@ export function Converter() {
         </div>
       )}
 
-      {/* File info */}
+      {/* File info + preview */}
       {file && (
-        <div className="surface p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-card bg-primary/10 flex items-center justify-center shrink-0">
-            <FileIcon size={20} className="text-primary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <p className="text-body font-semibold truncate">{file.name}</p>
-              {fileCategory && (
-                <span
-                  className={`shrink-0 h-5 px-2 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center ${
-                    BADGE_STYLES[fileCategory.category] ?? "bg-elevated text-muted"
+        <div className="surface overflow-hidden">
+          {previewUrl && (
+            <div className="bg-elevated/30 flex items-center justify-center p-4" style={{ maxHeight: 220 }}>
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="max-h-[200px] max-w-full object-contain rounded-control"
+              />
+            </div>
+          )}
+          {!previewUrl && fileCategory && (
+            <div className="bg-elevated/30 flex items-center justify-center py-6">
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  className={`h-16 w-16 rounded-2xl flex items-center justify-center ${
+                    BADGE_STYLES[fileCategory.category]?.split(" ")[0] ?? "bg-elevated"
                   }`}
                 >
-                  {fileCategory.label.replace(/s$/, "")}
-                </span>
+                  <span
+                    className={`text-lg font-bold uppercase ${
+                      BADGE_STYLES[fileCategory.category]?.split(" ")[1] ?? "text-muted"
+                    }`}
+                  >
+                    {getExtension(file.name)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-card bg-primary/10 flex items-center justify-center shrink-0">
+              <FileIcon size={20} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-body font-semibold truncate">{file.name}</p>
+                {fileCategory && (
+                  <span
+                    className={`shrink-0 h-5 px-2 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center ${
+                      BADGE_STYLES[fileCategory.category] ?? "bg-elevated text-muted"
+                    }`}
+                  >
+                    {fileCategory.label.replace(/s$/, "")}
+                  </span>
+                )}
+              </div>
+              {file.size > 0 && (
+                <p className="text-footnote text-muted">{formatSize(file.size)}</p>
               )}
             </div>
-            {file.size > 0 && (
-              <p className="text-footnote text-muted">{formatSize(file.size)}</p>
-            )}
+            <button
+              onClick={clear}
+              className="h-8 w-8 rounded-full flex items-center justify-center text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            onClick={clear}
-            className="h-8 w-8 rounded-full flex items-center justify-center text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-          >
-            <X size={16} />
-          </button>
         </div>
       )}
 

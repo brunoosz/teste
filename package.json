@@ -34,19 +34,11 @@
       "dist/**/*",
       "dist-electron/main.js",
       "dist-electron/preload.js",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "node_modules/sharp",
-        "to": "node_modules/sharp"
-      },
-      {
-        "from": "node_modules/ffmpeg-static",
-        "to": "node_modules/ffmpeg-static"
-      }
+      "package.json",
+      "node_modules/**/*"
     ],
     "asarUnpack": [
+      "node_modules/sharp/**",
       "node_modules/ffmpeg-static/**"
     ],
     "win": {

@@ -9,6 +9,24 @@ const isDev = process.argv.includes("--dev");
 const DEV_URL = "http://localhost:5173";
 const APP_HTML = path.resolve(__dirname, "..", "dist", "index.html");
 
+process.on("uncaughtException", (err) => {
+  const msg = `${err.stack || err.message || err}`;
+  try {
+    dialog.showErrorBox("FileFlow — Erro", msg);
+  } catch {}
+  fs.writeFileSync(
+    path.join(os.tmpdir(), "fileflow-crash.log"),
+    `${new Date().toISOString()}\n${msg}\n`,
+  );
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = `Unhandled rejection: ${reason}`;
+  try {
+    dialog.showErrorBox("FileFlow — Erro", msg);
+  } catch {}
+});
+
 if (process.platform === "win32") {
   app.setAppUserModelId("com.fileflow.app");
   app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
@@ -53,15 +71,29 @@ function createWindow(): void {
     },
   });
 
-  win.once("ready-to-show", () => win?.show());
+  const showTimeout = setTimeout(() => {
+    if (win && !win.isVisible()) {
+      win.show();
+    }
+  }, 5000);
+
+  win.once("ready-to-show", () => {
+    clearTimeout(showTimeout);
+    win?.show();
+  });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https://")) shell.openExternal(url);
     return { action: "deny" };
   });
 
-  if (isDev) void win.loadURL(DEV_URL);
-  else void win.loadFile(APP_HTML);
+  const load = isDev ? win.loadURL(DEV_URL) : win.loadFile(APP_HTML);
+  load.catch((err) => {
+    const msg = `Falha ao carregar: ${err.message}\nPath: ${APP_HTML}\nExists: ${fs.existsSync(APP_HTML)}`;
+    dialog.showErrorBox("FileFlow — Erro ao iniciar", msg);
+    clearTimeout(showTimeout);
+    win?.show();
+  });
 }
 
 function tmpPath(ext: string): string {

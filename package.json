@@ -1,7 +1,7 @@
 {
   "name": "fileflow",
   "productName": "FileFlow",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "FileFlow — Converta arquivos e remova fundos.",
   "main": "dist-electron/main.js",
   "author": "Bruno Camperlingo",
@@ -34,7 +34,11 @@
       "dist/**/*",
       "dist-electron/main.js",
       "dist-electron/preload.js",
-      "package.json"
+      "package.json",
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/ffmpeg-static/**",
+      "node_modules/@imgly/**"
     ],
     "asarUnpack": [
       "node_modules/sharp/**",

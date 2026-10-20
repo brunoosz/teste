@@ -11,7 +11,6 @@ const common = {
   format: "cjs",
   sourcemap: false,
   logLevel: "warning",
-  packages: "external",
 };
 
 await Promise.all([
@@ -19,7 +18,7 @@ await Promise.all([
     ...common,
     entryPoints: [path.join(root, "electron/main.ts")],
     outfile: path.join(root, "dist-electron/main.js"),
-    external: ["electron"],
+    external: ["electron", "sharp", "ffmpeg-static", "@imgly/background-removal-node"],
   }),
   build({
     ...common,

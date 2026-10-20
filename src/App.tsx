@@ -26,14 +26,22 @@ function useTheme() {
   return { theme, toggle };
 }
 
+const isDesktop = (() => {
+  const p = window.fileflow?.platform;
+  return p === "darwin" || p === "win32" || p === "linux";
+})();
+
 export default function App() {
   const [tab, setTab] = useState<Tab>("convert");
   const { theme, toggle } = useTheme();
 
   return (
     <div className="h-full flex flex-col">
-      {/* Title bar drag area */}
-      <div className="drag h-[44px] shrink-0" />
+      {isDesktop ? (
+        <div className="drag h-[44px] shrink-0" />
+      ) : (
+        <div className="shrink-0" style={{ height: "env(safe-area-inset-top, 0px)" }} />
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 pb-8 no-scrollbar">
         <div className="max-w-[560px] mx-auto">

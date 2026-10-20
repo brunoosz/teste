@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell, session } from "elect
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { getTargets, findEngine, getCategory, getAllFormats } from "./engines/registry";
+import type { EngineHelpers } from "./engines/types";
 
 const isDev = process.argv.includes("--dev");
 const DEV_URL = "http://localhost:5173";
@@ -66,68 +68,24 @@ function tmpPath(ext: string): string {
   return path.join(os.tmpdir(), `fileflow-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`);
 }
 
-const IMAGE_EXTENSIONS = new Set([
-  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif",
-]);
+async function htmlToPdf(html: string): Promise<Buffer> {
+  const pdfWin = new BrowserWindow({
+    show: false,
+    width: 800,
+    height: 600,
+    webPreferences: { offscreen: true },
+  });
 
-const CONVERSION_MAP: Record<string, string[]> = {};
-for (const ext of IMAGE_EXTENSIONS) {
-  CONVERSION_MAP[ext] = [...IMAGE_EXTENSIONS].filter((e) => e !== ext).sort();
-}
-CONVERSION_MAP["pdf"] = ["png", "jpg"];
-CONVERSION_MAP["svg"] = ["png", "jpg", "webp"];
-
-function getTargets(ext: string): string[] {
-  return CONVERSION_MAP[ext.toLowerCase()] ?? [];
-}
-
-async function convertImage(inputPath: string, outputFormat: string): Promise<string> {
-  const sharp = (await import("sharp")).default;
-  const outPath = tmpPath(outputFormat === "jpg" ? "jpg" : outputFormat);
-
-  let pipeline = sharp(inputPath);
-
-  if (outputFormat === "jpg" || outputFormat === "jpeg") {
-    pipeline = pipeline.flatten({ background: "#ffffff" }).jpeg({ quality: 92 });
-  } else if (outputFormat === "png") {
-    pipeline = pipeline.png();
-  } else if (outputFormat === "webp") {
-    pipeline = pipeline.webp({ quality: 90 });
-  } else if (outputFormat === "gif") {
-    pipeline = pipeline.gif();
-  } else if (outputFormat === "tiff" || outputFormat === "tif") {
-    pipeline = pipeline.tiff();
-  } else if (outputFormat === "avif") {
-    pipeline = pipeline.avif({ quality: 80 });
-  } else if (outputFormat === "bmp") {
-    pipeline = pipeline.raw();
-    const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
-    const bmpPath = tmpPath("bmp");
-    const sharp2 = (await import("sharp")).default;
-    await sharp2(data, { raw: { width: info.width, height: info.height, channels: info.channels as 1 | 2 | 3 | 4 } })
-      .toFormat("png")
-      .toFile(bmpPath);
-    return bmpPath;
-  } else if (outputFormat === "ico") {
-    pipeline = pipeline.resize(256, 256, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png();
-    const outIco = tmpPath("png");
-    await pipeline.toFile(outIco);
-    return outIco;
+  try {
+    await pdfWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
+    const pdfBuffer = await pdfWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+    });
+    return Buffer.from(pdfBuffer);
+  } finally {
+    pdfWin.destroy();
   }
-
-  await pipeline.toFile(outPath);
-  return outPath;
-}
-
-async function convertPdfToImage(inputPath: string, outputFormat: string): Promise<string> {
-  const sharp = (await import("sharp")).default;
-  const pdfParse = (await import("pdf-parse")).default;
-  const buf = fs.readFileSync(inputPath);
-  await pdfParse(buf);
-
-  const outPath = tmpPath(outputFormat);
-  await sharp(buf).toFormat(outputFormat as any).toFile(outPath);
-  return outPath;
 }
 
 async function removeBackground(inputPath: string): Promise<string> {
@@ -141,6 +99,8 @@ async function removeBackground(inputPath: string): Promise<string> {
   return outPath;
 }
 
+const helpers: EngineHelpers = { tmpPath, htmlToPdf };
+
 app.whenReady().then(() => {
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
 
@@ -148,15 +108,16 @@ app.whenReady().then(() => {
 
   ipcMain.handle("get-targets", (_e, ext: string) => getTargets(ext));
 
+  ipcMain.handle("get-category", (_e, ext: string) => getCategory(ext));
+
+  ipcMain.handle("get-all-formats", () => getAllFormats());
+
   ipcMain.handle("convert-file", async (_e, args: { inputPath: string; outputFormat: string }) => {
     const ext = path.extname(args.inputPath).slice(1).toLowerCase();
-    if (IMAGE_EXTENSIONS.has(ext) || ext === "svg") {
-      return { outputPath: await convertImage(args.inputPath, args.outputFormat) };
-    }
-    if (ext === "pdf") {
-      return { outputPath: await convertPdfToImage(args.inputPath, args.outputFormat) };
-    }
-    throw new Error(`Formato ${ext} não suportado`);
+    const engine = findEngine(ext);
+    if (!engine) throw new Error(`Formato ${ext} não suportado`);
+    const outputPath = await engine.convert(args.inputPath, args.outputFormat, helpers);
+    return { outputPath };
   });
 
   ipcMain.handle("remove-bg", async (_e, args: { inputPath: string }) => {
@@ -182,6 +143,32 @@ app.whenReady().then(() => {
     fs.copyFileSync(args.sourcePath, result.filePath);
     shell.showItemInFolder(result.filePath);
     return result.filePath;
+  });
+
+  ipcMain.handle("read-file-preview", async (_e, args: { filePath: string; maxSize?: number }) => {
+    const maxSize = args.maxSize ?? 400;
+    const sharp = (await import("sharp")).default;
+    const img = sharp(args.filePath);
+    const meta = await img.metadata();
+    const w = meta.width ?? maxSize;
+    const h = meta.height ?? maxSize;
+    const scale = Math.min(1, maxSize / Math.max(w, h));
+    const buf = await img
+      .resize(Math.round(w * scale), Math.round(h * scale), { fit: "inside" })
+      .png()
+      .toBuffer();
+    return {
+      dataUrl: `data:image/png;base64,${buf.toString("base64")}`,
+      width: Math.round(w * scale),
+      height: Math.round(h * scale),
+    };
+  });
+
+  ipcMain.handle("read-file-base64", async (_e, args: { filePath: string }) => {
+    const buf = fs.readFileSync(args.filePath);
+    const ext = path.extname(args.filePath).slice(1).toLowerCase();
+    const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    return { dataUrl: `data:${mime};base64,${buf.toString("base64")}` };
   });
 
   ipcMain.handle("set-theme", (_e, theme: "dark" | "light") => {

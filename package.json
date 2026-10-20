@@ -17,7 +17,10 @@
     "electron:dev": "node scripts/build-electron.mjs && concurrently -k -n vite,app \"vite\" \"wait-on tcp:5173 && electron . --dev\"",
     "electron:start": "npm run build && electron .",
     "electron:build": "npm run build && electron-builder",
-    "electron:build:win": "npm run build && electron-builder --win --x64"
+    "electron:build:win": "npm run build && electron-builder --win --x64",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
+    "build:mobile": "npm run build:renderer && npx cap sync android"
   },
   "build": {
     "appId": "com.fileflow.app",
@@ -37,7 +40,14 @@
       {
         "from": "node_modules/sharp",
         "to": "node_modules/sharp"
+      },
+      {
+        "from": "node_modules/ffmpeg-static",
+        "to": "node_modules/ffmpeg-static"
       }
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
     ],
     "win": {
       "target": [
@@ -70,16 +80,27 @@
     }
   },
   "dependencies": {
-    "sharp": "^0.33.5",
     "@imgly/background-removal-node": "^1.4.5",
+    "adm-zip": "^0.6.1",
+    "exceljs": "^4.4.0",
+    "ffmpeg-static": "^5.2.0",
+    "mammoth": "^1.13.0",
+    "marked": "^18.1.1",
+    "papaparse": "^5.7.0",
     "pdf-lib": "^1.17.1",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "sharp": "^0.33.5",
+    "tar-stream": "^3.2.2",
+    "turndown": "^7.2.4"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^22.20.5",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/turndown": "^5.0.6",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "clsx": "^2.1.1",

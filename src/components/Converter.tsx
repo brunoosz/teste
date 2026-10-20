@@ -1,17 +1,103 @@
 import { useCallback, useState } from "react";
 import { motion } from "framer-motion";
-import { Upload, FileIcon, X, Check, Download, AlertCircle } from "lucide-react";
+import {
+  Upload,
+  FileIcon,
+  X,
+  Check,
+  Download,
+  AlertCircle,
+  Image,
+  FileText,
+  Music,
+  Film,
+  Table2,
+  Archive,
+  BookOpen,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 type Status = "idle" | "loading" | "success" | "error";
 
-const IMAGE_EXTS = new Set([
-  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif", "svg",
-]);
+interface CategoryInfo {
+  category: string;
+  label: string;
+}
 
-const ALL_TARGETS = [
-  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico",
+const CATEGORIES: { category: string; label: string; icon: typeof Image; extensions: string[]; color: string }[] = [
+  {
+    category: "image",
+    label: "Imagens",
+    icon: Image,
+    extensions: ["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG", "HEIC", "HEIF"],
+    color: "primary",
+  },
+  {
+    category: "document",
+    label: "Documentos",
+    icon: FileText,
+    extensions: ["PDF", "DOCX", "DOC", "PPTX", "TXT", "HTML", "MD", "RTF"],
+    color: "secondary",
+  },
+  {
+    category: "audio",
+    label: "Áudio",
+    icon: Music,
+    extensions: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "OPUS", "AIFF"],
+    color: "success",
+  },
+  {
+    category: "video",
+    label: "Vídeo",
+    icon: Film,
+    extensions: ["MP4", "MKV", "WEBM", "AVI", "MOV", "GIF", "FLV", "WMV", "TS", "M4V"],
+    color: "warning",
+  },
+  {
+    category: "spreadsheet",
+    label: "Planilhas",
+    icon: Table2,
+    extensions: ["XLSX", "CSV", "JSON", "XML", "ODS", "TSV"],
+    color: "info",
+  },
+  {
+    category: "archive",
+    label: "Compactados",
+    icon: Archive,
+    extensions: ["ZIP", "TAR", "GZ", "TGZ", "RAR", "7Z"],
+    color: "accent",
+  },
+  {
+    category: "ebook",
+    label: "E-books",
+    icon: BookOpen,
+    extensions: ["EPUB", "CBZ", "MOBI", "AZW3", "FB2"],
+    color: "ebook",
+  },
 ];
+
+const EXT_TO_CATEGORY: Record<string, CategoryInfo> = {};
+for (const cat of CATEGORIES) {
+  for (const ext of cat.extensions) {
+    EXT_TO_CATEGORY[ext.toLowerCase()] = { category: cat.category, label: cat.label };
+  }
+}
+
+const FALLBACK_TARGETS: Record<string, string[]> = {
+  image: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico", "heic", "heif"],
+  document: ["pdf", "docx", "doc", "pptx", "txt", "html", "md", "rtf"],
+  audio: ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus", "aiff"],
+  video: ["mp4", "mkv", "webm", "avi", "mov", "gif", "flv", "wmv", "ts", "m4v"],
+  spreadsheet: ["xlsx", "csv", "json", "xml", "tsv"],
+  archive: ["zip", "tar", "tgz", "rar", "7z"],
+  ebook: ["txt", "html", "pdf"],
+};
+
+function fallbackTargets(ext: string): string[] {
+  const cat = EXT_TO_CATEGORY[ext];
+  if (!cat) return [];
+  return (FALLBACK_TARGETS[cat.category] ?? []).filter((t) => t !== ext);
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
@@ -23,36 +109,70 @@ function getExtension(name: string): string {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "avif", "ico", "svg", "heic", "heif"]);
+
+const BADGE_STYLES: Record<string, string> = {
+  image: "bg-primary/10 text-primary",
+  document: "bg-secondary/10 text-secondary",
+  audio: "bg-success/10 text-success",
+  video: "bg-warning/10 text-warning",
+  spreadsheet: "bg-emerald-500/10 text-emerald-500",
+  archive: "bg-amber-500/10 text-amber-500",
+  ebook: "bg-violet-500/10 text-violet-500",
+};
+
 export function Converter() {
   const [file, setFile] = useState<File | null>(null);
   const [filePath, setFilePath] = useState<string | null>(null);
+  const [fileCategory, setFileCategory] = useState<CategoryInfo | null>(null);
   const [targets, setTargets] = useState<string[]>([]);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [statusMsg, setStatusMsg] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const isElectron = !!window.fileflow;
 
-  const handleFile = useCallback(async (f: File, path?: string) => {
-    setFile(f);
-    setFilePath(path ?? null);
-    setSelectedTarget(null);
-    setStatus("idle");
+  const handleFile = useCallback(
+    async (f: File, path?: string) => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setFile(f);
+      setFilePath(path ?? null);
+      setSelectedTarget(null);
+      setStatus("idle");
+      setPreviewUrl(null);
 
-    const ext = getExtension(f.name);
+      const ext = getExtension(f.name);
+      const isImage = IMAGE_EXTENSIONS.has(ext);
 
-    if (isElectron) {
-      const result = await window.fileflow!.invoke("get-targets", ext) as string[];
-      setTargets(result);
-    } else {
-      if (IMAGE_EXTS.has(ext)) {
-        setTargets(ALL_TARGETS.filter((t) => t !== ext));
-      } else {
-        setTargets([]);
+      if (isImage) {
+        if (f.size > 0) {
+          setPreviewUrl(URL.createObjectURL(f));
+        } else if (isElectron && path) {
+          try {
+            const result = (await window.fileflow!.invoke("read-file-preview", {
+              filePath: path,
+            })) as { dataUrl: string };
+            setPreviewUrl(result.dataUrl);
+          } catch {}
+        }
       }
-    }
-  }, [isElectron]);
+
+      if (isElectron) {
+        const [tgts, cat] = await Promise.all([
+          window.fileflow!.invoke("get-targets", ext) as Promise<string[]>,
+          window.fileflow!.invoke("get-category", ext) as Promise<CategoryInfo | null>,
+        ]);
+        setTargets(tgts);
+        setFileCategory(cat);
+      } else {
+        setTargets(fallbackTargets(ext));
+        setFileCategory(EXT_TO_CATEGORY[ext] ?? null);
+      }
+    },
+    [isElectron, previewUrl],
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -64,12 +184,12 @@ export function Converter() {
         void handleFile(f, path);
       }
     },
-    [handleFile]
+    [handleFile],
   );
 
   const handlePick = useCallback(async () => {
     if (isElectron) {
-      const path = await window.fileflow!.invoke("pick-file") as string | null;
+      const path = (await window.fileflow!.invoke("pick-file")) as string | null;
       if (!path) return;
       const name = path.split(/[\\/]/).pop() ?? "file";
       const fakeFile = new File([], name);
@@ -97,7 +217,8 @@ export function Converter() {
           outputFormat: selectedTarget,
         })) as { outputPath: string };
 
-        const name = (file?.name ?? "arquivo").replace(/\.[^.]+$/, "") + "." + selectedTarget;
+        const name =
+          (file?.name ?? "arquivo").replace(/\.[^.]+$/, "") + "." + selectedTarget;
         await window.fileflow!.invoke("save-file", {
           defaultName: name,
           sourcePath: result.outputPath,
@@ -116,11 +237,14 @@ export function Converter() {
   }, [selectedTarget, filePath, file, isElectron]);
 
   const clear = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setFilePath(null);
+    setFileCategory(null);
     setTargets([]);
     setSelectedTarget(null);
     setStatus("idle");
+    setPreviewUrl(null);
   };
 
   return (
@@ -132,40 +256,83 @@ export function Converter() {
             dragOver ? "border-primary/60 bg-primary/[0.04]" : ""
           }`}
           onClick={handlePick}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Upload size={22} className="text-primary" />
           </div>
-          <p className="text-body text-fg font-medium mb-1">
-            Arraste um arquivo aqui
-          </p>
+          <p className="text-body text-fg font-medium mb-1">Arraste um arquivo aqui</p>
           <p className="text-footnote text-muted">
-            ou <span className="text-primary font-semibold">clique para selecionar</span>
+            ou{" "}
+            <span className="text-primary font-semibold">clique para selecionar</span>
           </p>
         </div>
       )}
 
-      {/* File info */}
+      {/* File info + preview */}
       {file && (
-        <div className="surface p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-card bg-primary/10 flex items-center justify-center shrink-0">
-            <FileIcon size={20} className="text-primary" />
+        <div className="surface overflow-hidden">
+          {previewUrl && (
+            <div className="bg-elevated/30 flex items-center justify-center p-4" style={{ maxHeight: 220 }}>
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="max-h-[200px] max-w-full object-contain rounded-control"
+              />
+            </div>
+          )}
+          {!previewUrl && fileCategory && (
+            <div className="bg-elevated/30 flex items-center justify-center py-6">
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  className={`h-16 w-16 rounded-2xl flex items-center justify-center ${
+                    BADGE_STYLES[fileCategory.category]?.split(" ")[0] ?? "bg-elevated"
+                  }`}
+                >
+                  <span
+                    className={`text-lg font-bold uppercase ${
+                      BADGE_STYLES[fileCategory.category]?.split(" ")[1] ?? "text-muted"
+                    }`}
+                  >
+                    {getExtension(file.name)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="p-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-card bg-primary/10 flex items-center justify-center shrink-0">
+              <FileIcon size={20} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <p className="text-body font-semibold truncate">{file.name}</p>
+                {fileCategory && (
+                  <span
+                    className={`shrink-0 h-5 px-2 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center ${
+                      BADGE_STYLES[fileCategory.category] ?? "bg-elevated text-muted"
+                    }`}
+                  >
+                    {fileCategory.label.replace(/s$/, "")}
+                  </span>
+                )}
+              </div>
+              {file.size > 0 && (
+                <p className="text-footnote text-muted">{formatSize(file.size)}</p>
+              )}
+            </div>
+            <button
+              onClick={clear}
+              className="h-8 w-8 rounded-full flex items-center justify-center text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-body font-semibold truncate">{file.name}</p>
-            {file.size > 0 && (
-              <p className="text-footnote text-muted">{formatSize(file.size)}</p>
-            )}
-          </div>
-          <button
-            onClick={clear}
-            className="h-8 w-8 rounded-full flex items-center justify-center text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-          >
-            <X size={16} />
-          </button>
         </div>
       )}
 
@@ -243,22 +410,37 @@ export function Converter() {
         </motion.div>
       )}
 
-      {/* Supported formats */}
-      <div className="mt-8 px-1">
-        <p className="text-caption text-muted mb-3">FORMATOS SUPORTADOS</p>
-        <div className="flex flex-wrap gap-1.5">
-          {["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG", "PDF"].map(
-            (f) => (
-              <span
-                key={f}
-                className="h-6 px-2.5 bg-elevated/60 rounded-chip text-caption text-muted flex items-center"
-              >
-                {f}
-              </span>
-            )
-          )}
+      {/* Supported formats — grouped by category */}
+      {!file && (
+        <div className="mt-6 space-y-4">
+          <p className="text-caption text-muted px-1">FORMATOS SUPORTADOS</p>
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon;
+            return (
+              <div key={cat.category} className="surface p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div
+                    className={`h-7 w-7 rounded-full flex items-center justify-center ${BADGE_STYLES[cat.category]?.split(" ")[0] ?? "bg-elevated"}`}
+                  >
+                    <Icon size={14} className={BADGE_STYLES[cat.category]?.split(" ")[1] ?? "text-muted"} />
+                  </div>
+                  <p className="text-callout font-semibold text-fg">{cat.label}</p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {cat.extensions.map((ext) => (
+                    <span
+                      key={ext}
+                      className="h-6 px-2.5 bg-elevated/60 rounded-chip text-caption text-muted flex items-center"
+                    >
+                      {ext}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
 }

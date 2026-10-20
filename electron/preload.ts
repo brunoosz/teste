@@ -2,11 +2,15 @@ import { contextBridge, ipcRenderer } from "electron";
 
 const INVOKE_CHANNELS = [
   "get-targets",
+  "get-category",
+  "get-all-formats",
   "convert-file",
   "remove-bg",
   "pick-file",
   "save-file",
   "set-theme",
+  "read-file-preview",
+  "read-file-base64",
 ] as const;
 
 const allowed = new Set<string>(INVOKE_CHANNELS);

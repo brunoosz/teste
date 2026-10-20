@@ -1,6 +1,6 @@
 import type { ConversionEngine, EngineHelpers } from "./types";
 
-const EXTENSIONS = ["mp4", "mkv", "webm", "avi", "mov", "gif"];
+const EXTENSIONS = ["mp4", "mkv", "webm", "avi", "mov", "gif", "flv", "wmv", "ts", "m4v"];
 
 const TARGETS: Record<string, string[]> = {};
 for (const ext of EXTENSIONS) {
@@ -39,6 +39,14 @@ async function convert(inputPath: string, outputFormat: string, helpers: EngineH
   } else if (out === "avi") {
     args.push("-codec:v", "mpeg4", "-q:v", "5", "-codec:a", "mp3", "-b:a", "192k");
   } else if (out === "mov") {
+    args.push("-codec:v", "libx264", "-preset", "medium", "-crf", "23", "-codec:a", "aac", "-b:a", "192k");
+  } else if (out === "flv") {
+    args.push("-codec:v", "flv1", "-q:v", "5", "-codec:a", "mp3", "-b:a", "128k");
+  } else if (out === "wmv") {
+    args.push("-codec:v", "wmv2", "-b:v", "2M", "-codec:a", "wmav2", "-b:a", "192k");
+  } else if (out === "ts") {
+    args.push("-codec:v", "libx264", "-preset", "medium", "-crf", "23", "-codec:a", "aac", "-b:a", "192k", "-f", "mpegts");
+  } else if (out === "m4v") {
     args.push("-codec:v", "libx264", "-preset", "medium", "-crf", "23", "-codec:a", "aac", "-b:a", "192k");
   } else if (out === "gif") {
     const filterArgs = [

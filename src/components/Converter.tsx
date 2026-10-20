@@ -29,28 +29,28 @@ const CATEGORIES: { category: string; label: string; icon: typeof Image; extensi
     category: "image",
     label: "Imagens",
     icon: Image,
-    extensions: ["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG"],
+    extensions: ["PNG", "JPG", "JPEG", "WEBP", "BMP", "GIF", "TIFF", "AVIF", "ICO", "SVG", "HEIC", "HEIF"],
     color: "primary",
   },
   {
     category: "document",
     label: "Documentos",
     icon: FileText,
-    extensions: ["PDF", "DOCX", "TXT", "HTML", "MD"],
+    extensions: ["PDF", "DOCX", "DOC", "PPTX", "TXT", "HTML", "MD", "RTF"],
     color: "secondary",
   },
   {
     category: "audio",
     label: "Áudio",
     icon: Music,
-    extensions: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "OPUS"],
+    extensions: ["MP3", "WAV", "OGG", "AAC", "FLAC", "M4A", "WMA", "OPUS", "AIFF"],
     color: "success",
   },
   {
     category: "video",
     label: "Vídeo",
     icon: Film,
-    extensions: ["MP4", "MKV", "WEBM", "AVI", "MOV", "GIF"],
+    extensions: ["MP4", "MKV", "WEBM", "AVI", "MOV", "GIF", "FLV", "WMV", "TS", "M4V"],
     color: "warning",
   },
   {
@@ -64,14 +64,14 @@ const CATEGORIES: { category: string; label: string; icon: typeof Image; extensi
     category: "archive",
     label: "Compactados",
     icon: Archive,
-    extensions: ["ZIP", "TAR", "GZ", "TGZ"],
+    extensions: ["ZIP", "TAR", "GZ", "TGZ", "RAR", "7Z"],
     color: "accent",
   },
   {
     category: "ebook",
     label: "E-books",
     icon: BookOpen,
-    extensions: ["EPUB", "CBZ"],
+    extensions: ["EPUB", "CBZ", "MOBI", "AZW3", "FB2"],
     color: "ebook",
   },
 ];
@@ -84,12 +84,12 @@ for (const cat of CATEGORIES) {
 }
 
 const FALLBACK_TARGETS: Record<string, string[]> = {
-  image: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico"],
-  document: ["pdf", "docx", "txt", "html", "md"],
-  audio: ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus"],
-  video: ["mp4", "mkv", "webm", "avi", "mov", "gif"],
+  image: ["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "avif", "ico", "heic", "heif"],
+  document: ["pdf", "docx", "doc", "pptx", "txt", "html", "md", "rtf"],
+  audio: ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus", "aiff"],
+  video: ["mp4", "mkv", "webm", "avi", "mov", "gif", "flv", "wmv", "ts", "m4v"],
   spreadsheet: ["xlsx", "csv", "json", "xml", "tsv"],
-  archive: ["zip", "tar", "tgz"],
+  archive: ["zip", "tar", "tgz", "rar", "7z"],
   ebook: ["txt", "html", "pdf"],
 };
 
@@ -109,7 +109,7 @@ function getExtension(name: string): string {
   return name.split(".").pop()?.toLowerCase() ?? "";
 }
 
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "avif", "ico", "svg"]);
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "avif", "ico", "svg", "heic", "heif"]);
 
 const BADGE_STYLES: Record<string, string> = {
   image: "bg-primary/10 text-primary",

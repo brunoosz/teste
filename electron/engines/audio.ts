@@ -1,6 +1,6 @@
 import type { ConversionEngine, EngineHelpers } from "./types";
 
-const EXTENSIONS = ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus"];
+const EXTENSIONS = ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus", "aiff"];
 
 const TARGETS: Record<string, string[]> = {};
 for (const ext of EXTENSIONS) {
@@ -42,6 +42,8 @@ async function convert(inputPath: string, outputFormat: string, helpers: EngineH
     args.push("-codec:a", "pcm_s16le");
   } else if (out === "wma") {
     args.push("-codec:a", "wmav2", "-b:a", "192k");
+  } else if (out === "aiff") {
+    args.push("-codec:a", "pcm_s16be");
   }
 
   args.push(outPath);

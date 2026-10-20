@@ -3,13 +3,15 @@ import path from "node:path";
 import os from "node:os";
 import type { ConversionEngine, EngineHelpers } from "./types";
 
-const EXTENSIONS = ["zip", "tar", "gz", "tgz"];
+const EXTENSIONS = ["zip", "tar", "gz", "tgz", "rar", "7z"];
 
 const TARGETS: Record<string, string[]> = {
   zip: ["tar", "tgz"],
   tar: ["zip", "tgz"],
   gz: ["zip", "tar"],
   tgz: ["zip", "tar"],
+  rar: ["zip", "tar", "tgz"],
+  "7z": ["zip", "tar", "tgz"],
 };
 
 function tmpDir(): string {
@@ -113,6 +115,32 @@ async function packTar(srcDir: string, outPath: string, gzip: boolean): Promise<
   }
 }
 
+async function extractRar(inputPath: string, destDir: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const exec = promisify(execFile);
+  try {
+    await exec("unrar", ["x", "-o+", inputPath, destDir + "/"], { timeout: 120_000 });
+  } catch {
+    try {
+      await exec("7z", ["x", `-o${destDir}`, "-y", inputPath], { timeout: 120_000 });
+    } catch {
+      throw new Error("Nenhum descompactador RAR encontrado. Instale unrar ou 7z.");
+    }
+  }
+}
+
+async function extract7z(inputPath: string, destDir: string): Promise<void> {
+  const { execFile } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const exec = promisify(execFile);
+  try {
+    await exec("7z", ["x", `-o${destDir}`, "-y", inputPath], { timeout: 120_000 });
+  } catch {
+    throw new Error("7z não encontrado. Instale p7zip ou 7-Zip.");
+  }
+}
+
 async function convert(inputPath: string, outputFormat: string, helpers: EngineHelpers): Promise<string> {
   const ext = inputPath.split(".").pop()!.toLowerCase();
   const fullName = path.basename(inputPath).toLowerCase();
@@ -126,6 +154,10 @@ async function convert(inputPath: string, outputFormat: string, helpers: EngineH
       await extractZip(inputPath, extractDir);
     } else if (ext === "tar" || ext === "gz" || ext === "tgz" || fullName.endsWith(".tar.gz")) {
       await extractTar(inputPath, extractDir);
+    } else if (ext === "rar") {
+      await extractRar(inputPath, extractDir);
+    } else if (ext === "7z") {
+      await extract7z(inputPath, extractDir);
     } else {
       throw new Error(`Formato ${ext} não suportado para extração`);
     }

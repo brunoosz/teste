@@ -1,15 +1,18 @@
 import fs from "node:fs";
 import type { ConversionEngine, EngineHelpers } from "./types";
 
-const EXTENSIONS = ["pdf", "docx", "txt", "html", "htm", "md"];
+const EXTENSIONS = ["pdf", "docx", "doc", "pptx", "txt", "html", "htm", "md", "rtf"];
 
 const TARGETS: Record<string, string[]> = {
   pdf: ["txt", "png", "jpg"],
   docx: ["html", "txt", "md", "pdf"],
+  doc: ["txt", "pdf"],
+  pptx: ["txt", "html", "pdf"],
   txt: ["html", "pdf", "md"],
   html: ["txt", "md", "pdf"],
   htm: ["txt", "md", "pdf"],
   md: ["html", "txt", "pdf"],
+  rtf: ["txt", "html", "pdf"],
 };
 
 function stripHtml(html: string): string {
@@ -167,6 +170,121 @@ async function convert(inputPath: string, outputFormat: string, helpers: EngineH
     if (out === "pdf" && helpers.htmlToPdf) {
       const htmlBody = await markdownToHtml(content);
       const pdfBuf = await helpers.htmlToPdf(wrapHtmlDoc(htmlBody));
+      fs.writeFileSync(outPath, pdfBuf);
+      return outPath;
+    }
+  }
+
+  if (ext === "pptx") {
+    const AdmZip = (await import("adm-zip")).default;
+    const zip = new AdmZip(inputPath);
+    const slideEntries = zip.getEntries()
+      .filter((e) => /^ppt\/slides\/slide\d+\.xml$/i.test(e.entryName))
+      .sort((a, b) => a.entryName.localeCompare(b.entryName));
+
+    let allText = "";
+    let allHtml = "";
+    let slideNum = 0;
+
+    for (const entry of slideEntries) {
+      slideNum++;
+      const xml = entry.getData().toString("utf-8");
+      const texts: string[] = [];
+      const regex = /<a:t>([^<]*)<\/a:t>/g;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(xml)) !== null) {
+        if (m[1].trim()) texts.push(m[1]);
+      }
+      const slideText = texts.join(" ");
+      if (slideText) {
+        allText += `--- Slide ${slideNum} ---\n${slideText}\n\n`;
+        allHtml += `<h3>Slide ${slideNum}</h3><p>${slideText.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>\n`;
+      }
+    }
+
+    if (out === "txt") {
+      fs.writeFileSync(outPath, allText.trim(), "utf-8");
+      return outPath;
+    }
+    if (out === "html") {
+      fs.writeFileSync(outPath, wrapHtmlDoc(allHtml, "Apresentação"), "utf-8");
+      return outPath;
+    }
+    if (out === "pdf" && helpers.htmlToPdf) {
+      const pdfBuf = await helpers.htmlToPdf(wrapHtmlDoc(allHtml, "Apresentação"));
+      fs.writeFileSync(outPath, pdfBuf);
+      return outPath;
+    }
+  }
+
+  if (ext === "doc") {
+    const buf = fs.readFileSync(inputPath);
+    const chunks: string[] = [];
+    let i = 0;
+    while (i < buf.length - 1) {
+      const code = buf[i] | (buf[i + 1] << 8);
+      if (code >= 0x20 && code <= 0x7e) {
+        chunks.push(String.fromCharCode(code));
+      } else if (code === 0x0d || code === 0x0a) {
+        chunks.push("\n");
+      }
+      i += 2;
+    }
+    let text = chunks.join("")
+      .replace(/[^\x20-\x7E\n\t]/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (!text || text.length < 20) {
+      const asciiChunks: string[] = [];
+      for (let j = 0; j < buf.length; j++) {
+        const b = buf[j];
+        if (b >= 0x20 && b <= 0x7e) asciiChunks.push(String.fromCharCode(b));
+        else if (b === 0x0d || b === 0x0a) asciiChunks.push("\n");
+      }
+      text = asciiChunks.join("")
+        .replace(/[^\x20-\x7E\n\t]/g, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    }
+
+    if (out === "txt") {
+      fs.writeFileSync(outPath, text, "utf-8");
+      return outPath;
+    }
+    if (out === "pdf" && helpers.htmlToPdf) {
+      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const pdfBuf = await helpers.htmlToPdf(wrapHtmlDoc(`<pre>${escaped}</pre>`));
+      fs.writeFileSync(outPath, pdfBuf);
+      return outPath;
+    }
+  }
+
+  if (ext === "rtf") {
+    const raw = fs.readFileSync(inputPath, "latin1");
+    const text = raw
+      .replace(/\{\\[^{}]*\}/g, "")
+      .replace(/\\par\b/g, "\n")
+      .replace(/\\line\b/g, "\n")
+      .replace(/\\tab\b/g, "\t")
+      .replace(/\\'([0-9a-fA-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+      .replace(/\\[a-z]+\d*\s?/gi, "")
+      .replace(/[{}]/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (out === "txt") {
+      fs.writeFileSync(outPath, text, "utf-8");
+      return outPath;
+    }
+    if (out === "html") {
+      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+      fs.writeFileSync(outPath, wrapHtmlDoc(`<p>${escaped}</p>`), "utf-8");
+      return outPath;
+    }
+    if (out === "pdf" && helpers.htmlToPdf) {
+      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const pdfBuf = await helpers.htmlToPdf(wrapHtmlDoc(`<pre>${escaped}</pre>`));
       fs.writeFileSync(outPath, pdfBuf);
       return outPath;
     }

@@ -1,7 +1,7 @@
 import type { ConversionEngine, EngineHelpers } from "./types";
 
 const IMAGE_EXTS = [
-  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif",
+  "png", "jpg", "jpeg", "webp", "bmp", "gif", "tiff", "tif", "ico", "avif", "heic", "heif",
 ];
 
 const SVG_TARGETS = ["png", "jpg", "webp"];

@@ -11,6 +11,9 @@ import {
   FileText,
   Music,
   Film,
+  Table2,
+  Archive,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -50,6 +53,27 @@ const CATEGORIES: { category: string; label: string; icon: typeof Image; extensi
     extensions: ["MP4", "MKV", "WEBM", "AVI", "MOV", "GIF"],
     color: "warning",
   },
+  {
+    category: "spreadsheet",
+    label: "Planilhas",
+    icon: Table2,
+    extensions: ["XLSX", "CSV", "JSON", "XML", "ODS", "TSV"],
+    color: "info",
+  },
+  {
+    category: "archive",
+    label: "Compactados",
+    icon: Archive,
+    extensions: ["ZIP", "TAR", "GZ", "TGZ"],
+    color: "accent",
+  },
+  {
+    category: "ebook",
+    label: "E-books",
+    icon: BookOpen,
+    extensions: ["EPUB", "CBZ"],
+    color: "ebook",
+  },
 ];
 
 const EXT_TO_CATEGORY: Record<string, CategoryInfo> = {};
@@ -64,6 +88,9 @@ const FALLBACK_TARGETS: Record<string, string[]> = {
   document: ["pdf", "docx", "txt", "html", "md"],
   audio: ["mp3", "wav", "ogg", "aac", "flac", "m4a", "wma", "opus"],
   video: ["mp4", "mkv", "webm", "avi", "mov", "gif"],
+  spreadsheet: ["xlsx", "csv", "json", "xml", "tsv"],
+  archive: ["zip", "tar", "tgz"],
+  ebook: ["txt", "html", "pdf"],
 };
 
 function fallbackTargets(ext: string): string[] {
@@ -87,6 +114,9 @@ const BADGE_STYLES: Record<string, string> = {
   document: "bg-secondary/10 text-secondary",
   audio: "bg-success/10 text-success",
   video: "bg-warning/10 text-warning",
+  spreadsheet: "bg-emerald-500/10 text-emerald-500",
+  archive: "bg-amber-500/10 text-amber-500",
+  ebook: "bg-violet-500/10 text-violet-500",
 };
 
 export function Converter() {

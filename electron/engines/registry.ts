@@ -2,9 +2,20 @@ import { imageEngine } from "./image";
 import { documentEngine } from "./document";
 import { audioEngine } from "./audio";
 import { videoEngine } from "./video";
+import { spreadsheetEngine } from "./spreadsheet";
+import { archiveEngine } from "./archive";
+import { ebookEngine } from "./ebook";
 import type { ConversionEngine } from "./types";
 
-export const engines: ConversionEngine[] = [imageEngine, documentEngine, audioEngine, videoEngine];
+export const engines: ConversionEngine[] = [
+  imageEngine,
+  documentEngine,
+  audioEngine,
+  videoEngine,
+  spreadsheetEngine,
+  archiveEngine,
+  ebookEngine,
+];
 
 export function findEngine(ext: string): ConversionEngine | undefined {
   return engines.find((e) => e.extensions.includes(ext.toLowerCase()));

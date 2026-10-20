@@ -1,7 +1,7 @@
 {
   "name": "fileflow",
   "productName": "FileFlow",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "FileFlow — Converta arquivos e remova fundos.",
   "main": "dist-electron/main.js",
   "author": "Bruno Camperlingo",
